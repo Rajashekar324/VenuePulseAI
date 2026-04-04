@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}VenuePulseAI – Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+    <!-- ===== Page Header ===== -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4 animate-fade-up">
+        <div>
+            <h1 class="fw-bold mb-1">
+                <i class="bi bi-speedometer2 me-2 vp-gradient-text"></i>Admin Dashboard
+            </h1>
+            <p class="text-secondary mb-0">Real-time overview of venue operations</p>
+        </div>
+        <button class="btn vp-btn-primary" id="refreshDashboard">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
+    </div>
+
+    <!-- ===== Metrics Cards (3 columns) ===== -->
+    <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+
+        <!-- Total Sales -->
+        <div class="col">
+            <div class="card vp-metric-card border-0 h-100 animate-fade-up delay-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="vp-metric-icon vp-metric-icon--sales">
+                            <i class="bi bi-cash-stack fs-4"></i>
+                        </span>
+                        <span class="badge bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-arrow-up-short"></i> Live
+                        </span>
+                    </div>
+                    <h6 class="text-secondary mb-1">Total Sales</h6>
+                    <h2 class="fw-bold mb-1">
+                        ${{ "%.2f"|format(total_concession_revenue) }}
+                    </h2>
+                    <p class="text-secondary small mb-0">
+                        <i class="bi bi-ticket-perforated me-1"></i>{{ total_tickets_sold }} tickets sold
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Staff -->
+        <div class="col">
+            <div class="card vp-metric-card border-0 h-100 animate-fade-up delay-200">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="vp-metric-icon vp-metric-icon--staff">
+                            <i class="bi bi-person-badge fs-4"></i>
+                        </span>
+                        <span class="badge bg-info bg-opacity-10 text-info">
+                            <i class="bi bi-people me-1"></i>On Duty
+                        </span>
+                    </div>
+                    <h6 class="text-secondary mb-1">Active Staff</h6>
+                    <h2 class="fw-bold mb-1">—</h2>
+                    <p class="text-secondary small mb-0">
+                        Shifts tracked per event
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suggested Actions -->
+        <div class="col">
+            <div class="card vp-metric-card border-0 h-100 animate-fade-up delay-300">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="vp-metric-icon vp-metric-icon--actions">
+                            <i class="bi bi-lightbulb fs-4"></i>
+                        </span>
+                        <span class="badge bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-robot me-1"></i>AI
+                        </span>
+                    </div>
+                    <h6 class="text-secondary mb-1">Suggested Actions</h6>
+                    <h2 class="fw-bold mb-1">—</h2>
+                    <p class="text-secondary small mb-0">
+                        Powered by CrewAI (Phase 4)
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Two-Column: Chart + CrewAI Reports ===== -->
+    <div class="row g-4 mb-5">
+
+        <!-- Dynamic Pricing Prediction Chart -->
+        <div class="col-lg-7">
+            <div class="card vp-panel border-0 h-100 animate-fade-up delay-200">
+                <div class="card-header vp-panel__header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="fw-bold mb-0">
+                            <i class="bi bi-graph-up-arrow me-2 text-primary"></i>Dynamic Pricing Prediction
+                        </h5>
+                    </div>
+                    <span class="badge vp-badge-phase">Phase 2</span>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Chart Placeholder -->
+                    <div class="vp-chart-placeholder d-flex flex-column align-items-center justify-content-center"
+                         id="pricingChart">
+                        <i class="bi bi-bar-chart-line display-3 mb-3 vp-gradient-text"></i>
+                        <h5 class="fw-bold mb-2">ML Pricing Model</h5>
+                        <p class="text-secondary text-center mb-3" style="max-width:360px;">
+                            Dynamic ticket price predictions based on demand, time-to-event, genre popularity, and historical patterns.
+                        </p>
+                        <div class="d-flex gap-2 flex-wrap justify-content-center">
+                            <span class="badge bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-cpu me-1"></i>Scikit-learn
+                            </span>
+                            <span class="badge bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-graph-up me-1"></i>Regression
+                            </span>
+                            <span class="badge bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-clock-history me-1"></i>Real-time
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Event Selector (functional stub) -->
+                    <div class="mt-4 pt-3 border-top border-secondary border-opacity-25">
+                        <div class="row align-items-end g-3">
+                            <div class="col-sm-8">
+                                <label class="form-label small text-secondary">Select Event</label>
+                                <select class="form-select form-select-sm vp-select" id="eventSelect" disabled>
+                                    <option selected>Available after Phase 2 integration</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-4">
+                                <button class="btn btn-sm vp-btn-primary w-100" disabled>
+                                    <i class="bi bi-lightning me-1"></i>Predict
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CrewAI Agent Reports -->
+        <div class="col-lg-5">
+            <div class="card vp-panel border-0 h-100 animate-fade-up delay-300">
+                <div class="card-header vp-panel__header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="fw-bold mb-0">
+                            <i class="bi bi-robot me-2 text-warning"></i>CrewAI Agent Reports
+                        </h5>
+                    </div>
+                    <span class="badge vp-badge-phase">Phase 4</span>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Agent List Placeholder -->
+                    <div class="vp-agent-list">
+                        <div class="vp-agent-item">
+                            <div class="vp-agent-item__icon vp-agent-item__icon--pricing">
+                                <i class="bi bi-tag"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-0">Pricing Agent</h6>
+                                <p class="text-secondary small mb-0">Adjusts ticket prices dynamically</p>
+                            </div>
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary ms-auto">Idle</span>
+                        </div>
+                        <div class="vp-agent-item">
+                            <div class="vp-agent-item__icon vp-agent-item__icon--staffing">
+                                <i class="bi bi-person-gear"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-0">Staffing Agent</h6>
+                                <p class="text-secondary small mb-0">Optimizes shift allocation</p>
+                            </div>
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary ms-auto">Idle</span>
+                        </div>
+                        <div class="vp-agent-item">
+                            <div class="vp-agent-item__icon vp-agent-item__icon--marketing">
+                                <i class="bi bi-megaphone"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-0">Marketing Agent</h6>
+                                <p class="text-secondary small mb-0">Generates promotional copy</p>
+                            </div>
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary ms-auto">Idle</span>
+                        </div>
+                    </div>
+
+                    <!-- Run Agents Button -->
+                    <div class="mt-4 pt-3 border-top border-secondary border-opacity-25">
+                        <button class="btn vp-btn-warning w-100" id="runAgentsBtn" disabled>
+                            <i class="bi bi-play-circle me-2"></i>Run Agent Workflow
+                        </button>
+                        <p class="text-secondary small text-center mt-2 mb-0">
+                            Multi-agent orchestration coming in Phase 4
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Upcoming Events Table ===== -->
+    <div class="card vp-panel border-0 animate-fade-up delay-400">
+        <div class="card-header vp-panel__header d-flex align-items-center justify-content-between">
+            <h5 class="fw-bold mb-0">
+                <i class="bi bi-calendar-week me-2 text-info"></i>Upcoming Events
+            </h5>
+            <span class="badge bg-info bg-opacity-10 text-info">{{ upcoming_events | length }} scheduled</span>
+        </div>
+        <div class="card-body p-0">
+            {% if upcoming_events %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover vp-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Event Name</th>
+                            <th>Date</th>
+                            <th>Genre</th>
+                            <th>Capacity</th>
+                            <th>Base Price</th>
+                            <th class="text-end">Predict</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in upcoming_events %}
+                        <tr>
+                            <td class="text-secondary">#{{ event.id }}</td>
+                            <td class="fw-semibold">{{ event.name }}</td>
+                            <td>{{ event.date.strftime('%b %d, %Y') }}</td>
+                            <td><span class="badge vp-badge-genre">{{ event.genre }}</span></td>
+                            <td><i class="bi bi-people me-1 text-secondary"></i>{{ event.capacity }}</td>
+                            <td class="fw-bold">${{ "%.2f"|format(event.base_ticket_price) }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('predict_price', event_id=event.id) }}"
+                                   class="btn btn-sm btn-outline-primary vp-btn-sm">
+                                    <i class="bi bi-lightning"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x display-4 text-secondary mb-3 d-block"></i>
+                <p class="text-secondary">No upcoming events scheduled</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

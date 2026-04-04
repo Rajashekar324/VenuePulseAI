@@ -1,0 +1,45 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Flask Instance Folder (secrets, local DB)
+instance/
+
+# Environment Variables
+.env
+.flaskenv
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Database files
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# Coverage & Testing
+htmlcov/
+.coverage
+.pytest_cache/
+.tox/

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}VenuePulseAI – Upcoming Events{% endblock %}
+
+{% block content %}
+
+<!-- ===== Hero Section ===== -->
+<section class="vp-hero text-center">
+    <div class="container">
+        <div class="vp-hero__badge mb-3 animate-fade-up">
+            <i class="bi bi-stars me-1"></i> AI-Powered Venue Management
+        </div>
+        <h1 class="vp-hero__title display-4 fw-bold mb-3 animate-fade-up delay-100">
+            Discover <span class="vp-gradient-text">Live Events</span><br>Near You
+        </h1>
+        <p class="vp-hero__subtitle lead text-secondary mx-auto mb-4 animate-fade-up delay-200" style="max-width:600px;">
+            Real-time dynamic pricing, personalized recommendations, and seamless ticketing — all in one place.
+        </p>
+        <div class="d-flex justify-content-center gap-3 flex-wrap animate-fade-up delay-300">
+            <a href="#events" class="btn btn-primary btn-lg vp-btn-primary px-4">
+                <i class="bi bi-ticket-perforated me-2"></i>Browse Events
+            </a>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light btn-lg px-4">
+                <i class="bi bi-speedometer2 me-2"></i>Admin Panel
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Upcoming Events Grid ===== -->
+<section id="events" class="container py-5 animate-fade-up delay-100">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Upcoming Events</h2>
+            <p class="text-secondary mb-0">Grab your tickets before they sell out</p>
+        </div>
+        <span class="badge vp-badge-glow fs-6">
+            <i class="bi bi-calendar-event me-1"></i>{{ events | length }} event{{ 's' if events | length != 1 }}
+        </span>
+    </div>
+
+    {% if events %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for event in events %}
+        <div class="col">
+            <div class="card vp-event-card h-100 border-0 animate-fade-up delay-{{ loop.index0 % 4 * 100 }}">
+                <!-- Card Header Accent -->
+                <div class="vp-event-card__accent"></div>
+                <div class="card-body d-flex flex-column p-4">
+                    <div class="d-flex align-items-start justify-content-between mb-3">
+                        <span class="badge vp-badge-genre">{{ event.genre }}</span>
+                        <span class="text-secondary small">
+                            <i class="bi bi-people-fill me-1"></i>{{ event.capacity }}
+                        </span>
+                    </div>
+                    <h5 class="card-title fw-bold mb-2">{{ event.name }}</h5>
+                    <p class="text-secondary small mb-3">
+                        <i class="bi bi-calendar3 me-1"></i>
+                        {{ event.date.strftime('%A, %b %d, %Y') }}
+                        <br>
+                        <i class="bi bi-clock me-1"></i>
+                        {{ event.date.strftime('%I:%M %p') }}
+                    </p>
+                    <div class="mt-auto d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-secondary small">From</span>
+                            <span class="fs-4 fw-bold vp-gradient-text">${{ "%.2f"|format(event.base_ticket_price) }}</span>
+                        </div>
+                        <button class="btn btn-sm vp-btn-primary px-3">
+                            <i class="bi bi-bag-plus me-1"></i>Get Tickets
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="vp-empty-state text-center py-5">
+        <i class="bi bi-music-note-beamed display-1 text-secondary mb-3 d-block"></i>
+        <h4 class="text-secondary">No upcoming events right now</h4>
+        <p class="text-secondary">Check back soon — exciting things are on the way!</p>
+    </div>
+    {% endif %}
+</section>
+
+<!-- ===== Floating Chat Icon ===== -->
+<button class="vp-chat-fab" id="chatFab" title="Chat with VenuePulseAI">
+    <i class="bi bi-chat-dots-fill fs-4"></i>
+</button>
+
+<!-- Chat Popover (placeholder) -->
+<div class="vp-chat-popover" id="chatPopover">
+    <div class="vp-chat-popover__header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-robot fs-5"></i>
+            <strong>VenuePulse AI</strong>
+        </div>
+        <button class="btn btn-sm btn-link text-white p-0" id="chatClose">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div class="vp-chat-popover__body" id="chatMessages">
+        <div class="vp-chat-bubble vp-chat-bubble--bot">
+            Hi! 👋 I'm your VenuePulseAI assistant.<br>
+            <span class="text-secondary small">Phase 3 — GenAI chatbot coming soon!</span>
+        </div>
+    </div>
+    <div class="vp-chat-popover__footer">
+        <input type="text" class="form-control form-control-sm vp-chat-input"
+               id="chatInput" placeholder="Ask me anything..." disabled>
+        <button class="btn btn-sm vp-btn-primary" disabled>
+            <i class="bi bi-send-fill"></i>
+        </button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Chat FAB toggle
+    const fab = document.getElementById('chatFab');
+    const popover = document.getElementById('chatPopover');
+    const chatClose = document.getElementById('chatClose');
+
+    fab.addEventListener('click', () => {
+        popover.classList.toggle('open');
+        fab.classList.toggle('active');
+    });
+    chatClose.addEventListener('click', () => {
+        popover.classList.remove('open');
+        fab.classList.remove('active');
+    });
+</script>
+{% endblock %}
