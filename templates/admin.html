@@ -2,6 +2,55 @@
 
 {% block title %}VenuePulseAI – Admin Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+    #pricingInsights {
+        display: none;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    #pricingInsights.is-visible {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    #pricingInsights.is-updating .forecast-metric-card {
+        opacity: 0.5;
+    }
+
+    .forecast-metric-card {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        min-height: 120px;
+        transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.3s ease;
+    }
+
+    .forecast-metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .forecast-metric-label {
+        color: #a1a1aa;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.5rem;
+    }
+
+    .forecast-metric-value {
+        color: #f4f4f5;
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-5">
 
@@ -13,9 +62,19 @@
             </h1>
             <p class="text-secondary mb-0">Real-time overview of venue operations</p>
         </div>
-        <button class="btn vp-btn-primary" id="refreshDashboard">
-            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-        </button>
+        <div class="d-flex align-items-center gap-2">
+            <button
+                type="button"
+                class="btn vp-btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#createEventModal"
+            >
+                ➕ Create New Event
+            </button>
+            <button class="btn vp-btn-primary" id="refreshDashboard">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </div>
     </div>
 
     <!-- ===== Metrics Cards (3 columns) ===== -->
@@ -125,18 +184,105 @@
 
                     <!-- Quick Event Selector (functional stub) -->
                     <div class="mt-4 pt-3 border-top border-secondary border-opacity-25">
-                        <div class="row align-items-end g-3">
-                            <div class="col-sm-8">
-                                <label class="form-label small text-secondary">Select Event</label>
-                                <select class="form-select form-select-sm vp-select" id="eventSelect" disabled>
-                                    <option selected>Available after Phase 2 integration</option>
-                                </select>
+                        <div class="row g-2">
+                            <div class="col-md-8 col-xl-9">
+                                <label class="form-label small text-secondary">Search Event</label>
+                                <div class="input-group input-group-sm mb-2">
+                                    <span class="input-group-text bg-dark border-secondary text-secondary">
+                                        <i class="bi bi-search"></i>
+                                    </span>
+                                    <input
+                                        type="text"
+                                        id="eventSearch"
+                                        class="form-control vp-select"
+                                        placeholder="Search events..."
+                                        autocomplete="off"
+                                    >
+                                </div>
+                                <div id="searchResults" class="list-group" style="display: none;"></div>
+
+                                <div class="d-flex flex-wrap align-items-center gap-2 mt-3" id="recentEventQuickSelect">
+                                    <p class="text-muted small mb-0 me-1">Quick Select:</p>
+                                    {% for event in recent_events %}
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-dark border border-secondary text-light text-truncate quick-event-btn"
+                                        data-id="{{ event.id }}"
+                                        style="max-width: 180px;"
+                                        title="{{ event.name }}"
+                                    >
+                                        {{ event.name }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
                             </div>
-                            <div class="col-sm-4">
-                                <button class="btn btn-sm vp-btn-primary w-100" disabled>
-                                    <i class="bi bi-lightning me-1"></i>Predict
-                                </button>
+                        </div>
+
+                        <div class="mt-4" id="pricingInsights">
+                            <div class="row row-cols-1 row-cols-md-3 g-3">
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">AI Suggested Price</div>
+                                        <div class="forecast-metric-value" id="metricOptimalPrice">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Expected Capacity</div>
+                                        <div class="forecast-metric-value" id="metricExpectedCapacity">0 (0%)</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Demand Status</div>
+                                        <div class="forecast-metric-value">
+                                            <span class="badge bg-secondary" id="metricDemandStatus">Unknown</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Event Budget</div>
+                                        <div class="forecast-metric-value" id="metricEventBudget">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Projected Ticket Revenue</div>
+                                        <div class="forecast-metric-value" id="metricTicketRevenue">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Estimated Secondary Revenue</div>
+                                        <div class="forecast-metric-value" id="metricSecondaryRevenue">$0.00</div>
+                                    </div>
+                                </div>
+
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Total Projected Revenue</div>
+                                        <div class="forecast-metric-value" id="metricTotalRevenue">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Net Profit</div>
+                                        <div class="forecast-metric-value" id="metricNetProfit">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="forecast-metric-card p-3">
+                                        <div class="forecast-metric-label">Break-Even Point</div>
+                                        <div class="forecast-metric-value" id="metricBreakEven">0 tickets</div>
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+
+                        <div class="mt-3" id="pricingInsightMessage">
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary">Select an event to run prediction</span>
                         </div>
                     </div>
                 </div>
@@ -199,6 +345,144 @@
                         </p>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Manage Events ===== -->
+    <div class="card vp-panel border-0 animate-fade-up delay-400 mb-5">
+        <div class="card-header vp-panel__header d-flex align-items-center justify-content-between">
+            <h5 class="fw-bold mb-0">
+                <i class="bi bi-kanban me-2 text-primary"></i>Manage Events
+            </h5>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary bg-opacity-10 text-primary">{{ recent_events | length }} recent</span>
+                <button
+                    class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#fullEventsCollapse"
+                    aria-expanded="false"
+                    aria-controls="fullEventsCollapse"
+                >
+                    Expand Full List
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if recent_events %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover vp-table mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Budget</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in recent_events %}
+                        <tr>
+                            <td class="fw-semibold">{{ event.name }}</td>
+                            <td>{{ event.date.strftime('%b %d, %Y %H:%M') }}</td>
+                            <td>
+                                <span class="badge vp-badge-genre">{{ event.event_type }}</span>
+                            </td>
+                            <td class="fw-bold">${{ "%.2f"|format(event.total_budget) }}</td>
+                            <td class="text-end">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-warning vp-btn-sm edit-event-btn"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#editEventModal"
+                                    data-id="{{ event.id }}"
+                                    data-name="{{ event.name | e }}"
+                                    data-date="{{ event.date.strftime('%Y-%m-%dT%H:%M') }}"
+                                    data-event-type="{{ event.event_type }}"
+                                    data-capacity="{{ event.capacity }}"
+                                    data-base-ticket-price="{{ '%.2f'|format(event.base_ticket_price) }}"
+                                    data-total-budget="{{ '%.2f'|format(event.total_budget) }}"
+                                >
+                                    Edit
+                                </button>
+                                <form
+                                    method="POST"
+                                    action="{{ url_for('admin_delete_event', event_id=event.id) }}"
+                                    class="d-inline"
+                                    onsubmit="return confirm('Are you sure?');"
+                                >
+                                    <button type="submit" class="btn btn-sm btn-outline-danger vp-btn-sm">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x display-4 text-secondary mb-3 d-block"></i>
+                <p class="text-secondary">No events available yet.</p>
+            </div>
+            {% endif %}
+
+            <div class="collapse border-top border-secondary border-opacity-25" id="fullEventsCollapse">
+                <div class="px-3 py-2 d-flex align-items-center justify-content-between">
+                    <span class="text-secondary small">All events (expanded view)</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-secondary">{{ all_events | length }} total</span>
+                </div>
+                {% if all_events %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover vp-table mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Budget</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in all_events %}
+                            <tr>
+                                <td class="fw-semibold">{{ event.name }}</td>
+                                <td>{{ event.date.strftime('%b %d, %Y %H:%M') }}</td>
+                                <td><span class="badge vp-badge-genre">{{ event.event_type }}</span></td>
+                                <td class="fw-bold">${{ "%.2f"|format(event.total_budget) }}</td>
+                                <td class="text-end">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-warning vp-btn-sm edit-event-btn"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editEventModal"
+                                        data-id="{{ event.id }}"
+                                        data-name="{{ event.name | e }}"
+                                        data-date="{{ event.date.strftime('%Y-%m-%dT%H:%M') }}"
+                                        data-event-type="{{ event.event_type }}"
+                                        data-capacity="{{ event.capacity }}"
+                                        data-base-ticket-price="{{ '%.2f'|format(event.base_ticket_price) }}"
+                                        data-total-budget="{{ '%.2f'|format(event.total_budget) }}"
+                                    >
+                                        Edit
+                                    </button>
+                                    <form
+                                        method="POST"
+                                        action="{{ url_for('admin_delete_event', event_id=event.id) }}"
+                                        class="d-inline"
+                                        onsubmit="return confirm('Are you sure?');"
+                                    >
+                                        <button type="submit" class="btn btn-sm btn-outline-danger vp-btn-sm">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -310,4 +594,315 @@
         </div>
     </div>
 </div>
+
+<!-- ===== Create Event Modal ===== -->
+<div class="modal fade" id="createEventModal" tabindex="-1" aria-labelledby="createEventModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light border border-secondary border-opacity-25 rounded-4">
+            <div class="modal-header border-secondary border-opacity-25">
+                <h5 class="modal-title" id="createEventModalLabel">
+                    <i class="bi bi-calendar-plus me-2"></i>Create New Event
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_create_event') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="eventName" class="form-label">Event Name</label>
+                        <input type="text" class="form-control vp-select" id="eventName" name="name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="eventDate" class="form-label">Date &amp; Time</label>
+                        <input type="datetime-local" class="form-control vp-select" id="eventDate" name="date" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="eventType" class="form-label">Event Type</label>
+                        <select class="form-select vp-select" id="eventType" name="event_type" required>
+                            <option value="" selected disabled>Select event type</option>
+                            <option value="Concert">Concert</option>
+                            <option value="Conference">Conference</option>
+                            <option value="Sports">Sports</option>
+                            <option value="Workshop">Workshop</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="eventCapacity" class="form-label">Capacity</label>
+                        <input type="number" class="form-control vp-select" id="eventCapacity" name="capacity" min="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="eventBaseTicketPrice" class="form-label">Base Ticket Price</label>
+                        <input type="number" class="form-control vp-select" id="eventBaseTicketPrice" name="base_ticket_price" step="0.01" min="0" required>
+                    </div>
+
+                    <div class="mb-0">
+                        <label for="eventTotalBudget" class="form-label">Total Budget / Estimated Cost</label>
+                        <input type="number" class="form-control vp-select" id="eventTotalBudget" name="total_budget" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary border-opacity-25">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn vp-btn-primary">Save Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Edit Event Modal ===== -->
+<div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light border border-secondary border-opacity-25 rounded-4">
+            <div class="modal-header border-secondary border-opacity-25">
+                <h5 class="modal-title" id="editEventModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Edit Event
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" id="editEventForm" action="{{ url_for('admin_edit_event', event_id=0) }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editEventName" class="form-label">Event Name</label>
+                        <input type="text" class="form-control vp-select" id="editEventName" name="name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editEventDate" class="form-label">Date &amp; Time</label>
+                        <input type="datetime-local" class="form-control vp-select" id="editEventDate" name="date" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editEventType" class="form-label">Event Type</label>
+                        <select class="form-select vp-select" id="editEventType" name="event_type" required>
+                            <option value="Concert">Concert</option>
+                            <option value="Conference">Conference</option>
+                            <option value="Sports">Sports</option>
+                            <option value="Workshop">Workshop</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editEventCapacity" class="form-label">Capacity</label>
+                        <input type="number" class="form-control vp-select" id="editEventCapacity" name="capacity" min="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editEventBaseTicketPrice" class="form-label">Base Ticket Price</label>
+                        <input type="number" class="form-control vp-select" id="editEventBaseTicketPrice" name="base_ticket_price" step="0.01" min="0" required>
+                    </div>
+
+                    <div class="mb-0">
+                        <label for="editEventTotalBudget" class="form-label">Total Budget / Estimated Cost</label>
+                        <input type="number" class="form-control vp-select" id="editEventTotalBudget" name="total_budget" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary border-opacity-25">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn vp-btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const eventSearch = document.getElementById("eventSearch");
+    const searchResults = document.getElementById("searchResults");
+    const quickEventButtons = document.querySelectorAll(".quick-event-btn");
+    const pricingInsights = document.getElementById("pricingInsights");
+    const pricingInsightMessage = document.getElementById("pricingInsightMessage");
+
+    const metricOptimalPrice = document.getElementById("metricOptimalPrice");
+    const metricExpectedCapacity = document.getElementById("metricExpectedCapacity");
+    const metricDemandStatus = document.getElementById("metricDemandStatus");
+    const metricEventBudget = document.getElementById("metricEventBudget");
+    const metricTicketRevenue = document.getElementById("metricTicketRevenue");
+    const metricSecondaryRevenue = document.getElementById("metricSecondaryRevenue");
+    const metricTotalRevenue = document.getElementById("metricTotalRevenue");
+    const metricNetProfit = document.getElementById("metricNetProfit");
+    const metricBreakEven = document.getElementById("metricBreakEven");
+    const editEventButtons = document.querySelectorAll(".edit-event-btn");
+    const editEventForm = document.getElementById("editEventForm");
+    const editEventName = document.getElementById("editEventName");
+    const editEventDate = document.getElementById("editEventDate");
+    const editEventType = document.getElementById("editEventType");
+    const editEventCapacity = document.getElementById("editEventCapacity");
+    const editEventBaseTicketPrice = document.getElementById("editEventBaseTicketPrice");
+    const editEventTotalBudget = document.getElementById("editEventTotalBudget");
+    let searchDebounceTimer = null;
+
+    function formatCurrency(value) {
+        return `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function formatNumber(value) {
+        return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+
+    function setDemandBadge(statusText) {
+        metricDemandStatus.textContent = statusText || "On Track";
+        metricDemandStatus.className = "badge";
+
+        if (statusText === "Cold") {
+            metricDemandStatus.classList.add("bg-danger");
+        } else if (statusText === "Surge Potential") {
+            metricDemandStatus.classList.add("bg-success");
+        } else {
+            metricDemandStatus.classList.add("bg-warning", "text-dark");
+        }
+    }
+
+    function setProfitColor(netProfit) {
+        metricNetProfit.classList.remove("text-success", "text-danger", "text-light");
+        if (netProfit >= 0) {
+            metricNetProfit.classList.add("text-success");
+        } else {
+            metricNetProfit.classList.add("text-danger");
+        }
+    }
+
+    function resetForecastView() {
+        pricingInsights.classList.remove("is-visible", "is-updating");
+        pricingInsightMessage.innerHTML = '<span class="badge bg-secondary bg-opacity-25 text-secondary">Select an event to run prediction</span>';
+    }
+
+    function hideSearchResults() {
+        if (!searchResults) {
+            return;
+        }
+        searchResults.innerHTML = "";
+        searchResults.style.display = "none";
+    }
+
+    async function loadForecastForEvent(eventId) {
+        if (!eventId) {
+            resetForecastView();
+            return;
+        }
+
+        pricingInsights.classList.add("is-visible", "is-updating");
+        pricingInsightMessage.innerHTML = '<span class="badge bg-info bg-opacity-25 text-info">Loading ML prediction...</span>';
+
+        try {
+            const response = await fetch(`/api/predict-price/${eventId}`);
+            if (!response.ok) {
+                throw new Error("Unable to fetch pricing insights");
+            }
+
+            const data = await response.json();
+
+            metricOptimalPrice.textContent = formatCurrency(data.predicted_optimal_price);
+
+            const expectedCount = Number(data.expected_attendance_count || 0);
+            const expectedPct = Number(data.expected_capacity_percentage || 0);
+            metricExpectedCapacity.textContent = `${formatNumber(expectedCount)} (${expectedPct.toFixed(2)}%)`;
+
+            setDemandBadge(data.demand_status);
+            metricEventBudget.textContent = formatCurrency(data.total_budget);
+            metricTicketRevenue.textContent = formatCurrency(data.projected_ticket_revenue);
+            metricSecondaryRevenue.textContent = formatCurrency(data.estimated_secondary_revenue);
+            metricTotalRevenue.textContent = formatCurrency(data.total_projected_revenue);
+
+            const netProfit = Number(data.net_profit || 0);
+            metricNetProfit.textContent = formatCurrency(netProfit);
+            setProfitColor(netProfit);
+
+            metricBreakEven.textContent = `${formatNumber(data.break_even_tickets)} tickets`;
+
+            pricingInsights.classList.add("is-visible");
+            requestAnimationFrame(() => {
+                pricingInsights.classList.remove("is-updating");
+            });
+            pricingInsightMessage.innerHTML = '<span class="badge bg-success bg-opacity-25 text-success">Insights updated successfully</span>';
+        } catch (error) {
+            pricingInsights.classList.remove("is-visible", "is-updating");
+            pricingInsightMessage.innerHTML = '<span class="badge bg-danger bg-opacity-25 text-danger">Failed to load prediction</span>';
+            console.error(error);
+        }
+    }
+
+    editEventButtons.forEach((button) => {
+        button.addEventListener("click", function () {
+            const eventId = this.dataset.id;
+            if (!eventId || !editEventForm) {
+                return;
+            }
+
+            editEventForm.action = `/admin/edit-event/${eventId}`;
+            editEventName.value = this.dataset.name || "";
+            editEventDate.value = this.dataset.date || "";
+            editEventType.value = this.dataset.eventType || "";
+            editEventCapacity.value = this.dataset.capacity || "";
+            editEventBaseTicketPrice.value = this.dataset.baseTicketPrice || "";
+            editEventTotalBudget.value = this.dataset.totalBudget || "";
+        });
+    });
+
+    quickEventButtons.forEach((button) => {
+        button.addEventListener("click", function () {
+            const eventId = this.dataset.id;
+            hideSearchResults();
+            loadForecastForEvent(eventId);
+        });
+    });
+
+    if (eventSearch) {
+        eventSearch.addEventListener("input", function () {
+            const query = this.value.trim();
+
+            if (searchDebounceTimer) {
+                clearTimeout(searchDebounceTimer);
+            }
+
+            if (query.length < 2) {
+                hideSearchResults();
+                return;
+            }
+
+            searchDebounceTimer = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/search-events?q=${encodeURIComponent(query)}`);
+                    if (!response.ok) {
+                        throw new Error("Search failed");
+                    }
+
+                    const items = await response.json();
+                    if (!Array.isArray(items) || items.length === 0) {
+                        searchResults.innerHTML = '<div class="list-group-item bg-dark text-secondary border-secondary">No events found</div>';
+                        searchResults.style.display = "block";
+                        return;
+                    }
+
+                    searchResults.innerHTML = "";
+                    items.forEach((item) => {
+                        const link = document.createElement("a");
+                        link.href = "#";
+                        link.className = "list-group-item list-group-item-action bg-dark text-light border-secondary";
+                        link.textContent = `${item.name} (${new Date(item.date).toLocaleDateString()})`;
+                        link.dataset.id = item.id;
+                        link.addEventListener("click", (clickEvent) => {
+                            clickEvent.preventDefault();
+                            loadForecastForEvent(item.id);
+                            eventSearch.value = item.name;
+                            hideSearchResults();
+                        });
+                        searchResults.appendChild(link);
+                    });
+                    searchResults.style.display = "block";
+                } catch (error) {
+                    searchResults.innerHTML = '<div class="list-group-item bg-dark text-danger border-secondary">Search error</div>';
+                    searchResults.style.display = "block";
+                    console.error(error);
+                }
+            }, 220);
+        });
+    }
+});
+</script>
 {% endblock %}

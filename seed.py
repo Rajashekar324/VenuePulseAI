@@ -15,16 +15,24 @@ def seed_data():
         now = datetime.now(timezone.utc)
         
         events_data = [
-            ("Neon Nights Cyberpunk Rave", now + timedelta(days=2), "Electronic", "Concert", 800, 45.0),
-            ("Symphony Under the Stars", now + timedelta(days=5), "Classical", "Concert", 1200, 75.0),
-            ("Indie Rock Showcase", now + timedelta(days=10), "Rock", "Concert", 400, 30.0),
-            ("Jazz & Blues Revival", now + timedelta(days=14), "Jazz", "Concert", 250, 55.0),
-            ("Global EDM Festival pre-party", now + timedelta(days=20), "Electronic", "Concert", 1500, 65.0),
+            ("Neon Nights Cyberpunk Rave", now + timedelta(days=2), "Electronic", "Concert", 800, 45.0, 50000.0),
+            ("Symphony Under the Stars", now + timedelta(days=5), "Classical", "Concert", 1200, 75.0, 110000.0),
+            ("Indie Rock Showcase", now + timedelta(days=10), "Rock", "Concert", 400, 30.0, 25000.0),
+            ("Jazz & Blues Revival", now + timedelta(days=14), "Jazz", "Concert", 250, 55.0, 40000.0),
+            ("Global EDM Festival pre-party", now + timedelta(days=20), "Electronic", "Concert", 1500, 65.0, 140000.0),
         ]
         
         events = []
-        for name, date, genre, event_type, capacity, price in events_data:
-            event = Event(name=name, date=date, genre=genre, event_type=event_type, capacity=capacity, base_ticket_price=price)
+        for name, date, genre, event_type, capacity, price, total_budget in events_data:
+            event = Event(
+                name=name,
+                date=date,
+                genre=genre,
+                event_type=event_type,
+                capacity=capacity,
+                base_ticket_price=price,
+                total_budget=total_budget,
+            )
             db.session.add(event)
             events.append(event)
             

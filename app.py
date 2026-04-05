@@ -2,10 +2,12 @@
 
 import os
 from datetime import datetime, timezone
+import math
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from flask_login import LoginManager, login_required, current_user, login_user, logout_user
+from sqlalchemy import text
 
 load_dotenv()
 
@@ -36,11 +38,24 @@ User.is_authenticated = True
 User.is_anonymous = False
 User.get_id = lambda self: str(self.id)
 
+
+def ensure_schema_compatibility():
+    """Lightweight runtime migration for legacy local SQLite databases."""
+    event_columns_result = db.session.execute(text("PRAGMA table_info(events)"))
+    event_columns = {row[1] for row in event_columns_result.fetchall()}
+
+    if "total_budget" not in event_columns:
+        db.session.execute(
+            text("ALTER TABLE events ADD COLUMN total_budget FLOAT NOT NULL DEFAULT 0.0")
+        )
+        db.session.commit()
+
 # ---------------------------------------------------------------------------
 # Auto-create tables before the first request
 # ---------------------------------------------------------------------------
 with app.app_context():
     db.create_all()
+    ensure_schema_compatibility()
     
     # Create test patron user if none exists
     if not User.query.filter_by(email="patron@example.com").first():
@@ -115,13 +130,8 @@ def logout():
 @app.route("/")
 def index():
     """Patron homepage – upcoming events."""
-    event_type = request.args.get("event_type")
-    
     query = Event.query.filter(Event.date >= datetime.now(timezone.utc))
-    if event_type:
-        query = query.filter(Event.event_type == event_type)
-        
-    events = query.order_by(Event.date.asc()).all()
+    events = query.order_by(Event.date.asc()).limit(8).all()
     return render_template("index.html", events=events)
 
 @app.route("/events")
@@ -172,6 +182,30 @@ def events_catalog():
             events = [e for e in events if e.date.weekday() in (5, 6)]
         
     return render_template("events_catalog.html", events=events, filters=request.args)
+
+@app.route("/my-tickets")
+@login_required
+def my_tickets():
+    """User profile page showing their past and upcoming bookings."""
+    if current_user.role == 'admin':
+        flash("Admins do not have personal ticketing accounts.", "warning")
+        return redirect(url_for('admin_dashboard'))
+
+    from sqlalchemy.orm import joinedload
+    from datetime import datetime
+    
+    page = request.args.get('page', 1, type=int)
+    
+    # Query all bookings bound strictly to the current session user, eagerly loading Event payload
+    pagination = Booking.query.filter_by(user_id=current_user.id)\
+        .options(joinedload(Booking.event))\
+        .order_by(Booking.timestamp.desc())\
+        .paginate(page=page, per_page=10, error_out=False)
+        
+    return render_template("my_tickets.html", 
+                           bookings=pagination.items, 
+                           pagination=pagination, 
+                           now=datetime.now)
 
 @app.route("/event/<int:event_id>")
 @login_required
@@ -269,6 +303,8 @@ def admin_dashboard():
         db.session.query(db.func.coalesce(db.func.sum(ConcessionSale.price), 0))
         .scalar()
     )
+    recent_events = Event.query.order_by(Event.id.desc()).limit(5).all()
+    all_events = Event.query.order_by(Event.date.desc()).all()
     upcoming_events = Event.query.filter(
         Event.date >= datetime.now(timezone.utc)
     ).order_by(Event.date.asc()).limit(5).all()
@@ -281,25 +317,110 @@ def admin_dashboard():
         total_events=total_events,
         total_tickets_sold=total_tickets_sold,
         total_concession_revenue=total_concession_revenue,
+        recent_events=recent_events,
+        all_events=all_events,
         upcoming_events=upcoming_events,
         open_tickets=open_tickets
     )
 
 
-# ---- Phase 2: Dynamic Pricing ML (placeholder) ----------------------------
+@app.route('/api/search-events', methods=['GET'])
+def search_events():
+    """Search events by partial name and return up to 10 lightweight records."""
+    query_text = request.args.get('q', '').strip()
 
-@app.route("/api/predict-price/<int:event_id>", methods=["GET"])
-def predict_price(event_id):
-    """Placeholder – will return ML-predicted ticket price."""
+    if not query_text:
+        return jsonify([])
+
+    matches = (
+        Event.query
+        .filter(Event.name.ilike(f"%{query_text}%"))
+        .order_by(Event.date.asc())
+        .limit(10)
+        .all()
+    )
+
+    payload = [
+        {
+            "id": event.id,
+            "name": event.name,
+            "date": event.date.isoformat() if event.date else None,
+        }
+        for event in matches
+    ]
+    return jsonify(payload)
+
+
+@app.route('/admin/create-event', methods=['POST'])
+@login_required
+def admin_create_event():
+    """Admin-only endpoint to create a new event from dashboard form payload."""
+    if current_user.role != 'admin':
+        abort(403)
+
+    name = request.form.get('name', '').strip()
+    date_raw = request.form.get('date', '').strip()
+    event_type = request.form.get('event_type', '').strip()
+    capacity_raw = request.form.get('capacity', '').strip()
+    base_ticket_price_raw = request.form.get('base_ticket_price', '').strip()
+    total_budget_raw = request.form.get('total_budget', '').strip()
+
+    event_date = datetime.fromisoformat(date_raw)
+    capacity = int(capacity_raw)
+    base_ticket_price = float(base_ticket_price_raw)
+    total_budget = float(total_budget_raw)
+
+    new_event = Event(
+        name=name,
+        date=event_date,
+        genre=event_type,
+        event_type=event_type,
+        capacity=capacity,
+        base_ticket_price=base_ticket_price,
+        total_budget=total_budget,
+    )
+    db.session.add(new_event)
+    db.session.commit()
+
+    flash('Event created successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/edit-event/<int:event_id>', methods=['POST'])
+@login_required
+def admin_edit_event(event_id):
+    """Admin-only endpoint to update an existing event."""
+    if current_user.role != 'admin':
+        abort(403)
+
     event = Event.query.get_or_404(event_id)
-    return jsonify({
-        "event_id": event.id,
-        "event_name": event.name,
-        "base_price": event.base_ticket_price,
-        "predicted_price": event.base_ticket_price,  # stub
-        "model_version": None,
-        "message": "Phase 2 – ML pricing model not yet integrated.",
-    })
+
+    event.name = request.form.get('name', event.name).strip()
+    event.date = datetime.fromisoformat(request.form.get('date', event.date.isoformat()).strip())
+    event.event_type = request.form.get('event_type', event.event_type).strip()
+    event.genre = event.event_type
+    event.capacity = int(request.form.get('capacity', event.capacity))
+    event.base_ticket_price = float(request.form.get('base_ticket_price', event.base_ticket_price))
+    event.total_budget = float(request.form.get('total_budget', event.total_budget))
+
+    db.session.commit()
+    flash('Event updated successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/delete-event/<int:event_id>', methods=['POST'])
+@login_required
+def admin_delete_event(event_id):
+    """Admin-only endpoint to delete an event."""
+    if current_user.role != 'admin':
+        abort(403)
+
+    event = Event.query.get_or_404(event_id)
+    db.session.delete(event)
+    db.session.commit()
+
+    flash('Event deleted successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 
 # ---- Phase 3: GenAI Chatbot (placeholder) ---------------------------------
@@ -331,6 +452,133 @@ def run_agents():
         "message": "Phase 4 – CrewAI agent workflow not yet integrated.",
     })
 
+
+# ---- Phase 2: ML Inference API ---------------------------------------------
+
+@app.route('/api/predict-price/<int:event_id>', methods=['GET'])
+@login_required
+def predict_price(event_id):
+    """Comprehensive financial forecasting endpoint for admin event planning."""
+    if current_user.role != 'admin':
+        return jsonify({"error": "Admin privileges strictly required for predictive APIs."}), 403
+
+    event = Event.query.get_or_404(event_id)
+
+    # Fetch current operational values from bookings/tickets.
+    tickets_sold = Ticket.query.filter_by(event_id=event_id, is_sold=True).count()
+    bookings = Booking.query.filter_by(event_id=event_id).order_by(Booking.timestamp.asc()).all()
+    booking_count = len(bookings)
+
+    total_budget = float(getattr(event, "total_budget", 0.0) or 0.0)
+
+    # Calculate time features in UTC.
+    from datetime import datetime, timezone
+    now_utc = datetime.now(timezone.utc)
+
+    if event.date.tzinfo is None:
+        event_date_aware = event.date.replace(tzinfo=timezone.utc)
+    else:
+        event_date_aware = event.date
+
+    days_left = max(0, (event_date_aware - now_utc).days)
+
+    if bookings:
+        first_booking_timestamp = bookings[0].timestamp
+        if first_booking_timestamp.tzinfo is None:
+            first_booking_timestamp = first_booking_timestamp.replace(tzinfo=timezone.utc)
+        days_since_creation = max(1.0, (now_utc - first_booking_timestamp).total_seconds() / 86400.0)
+    else:
+        days_since_creation = 1.0
+
+    current_sales_velocity = tickets_sold / days_since_creation
+
+    # Load model artifacts lazily at request time.
+    import os
+    import json
+    import pandas as pd
+    import joblib
+
+    model_path = os.path.join("ml_models", "demand_pricing_multi_output_model.pkl")
+    metadata_path = os.path.join("ml_models", "demand_pricing_metadata.json")
+
+    if not os.path.exists(model_path):
+        return jsonify({"error": "Forecast model missing. Run train_pricing_model.py first."}), 404
+
+    forecast_model = joblib.load(model_path)
+
+    target_order = ["expected_total_attendance", "optimal_ticket_price"]
+    if os.path.exists(metadata_path):
+        with open(metadata_path, "r", encoding="utf-8") as metadata_file:
+            metadata = json.load(metadata_file)
+        target_order = metadata.get("targets", target_order)
+
+    # Build model input using the same features used during training.
+    input_df = pd.DataFrame([{
+        "event_type": event.event_type,
+        "days_until_event": days_left,
+        "current_tickets_sold": tickets_sold,
+        "current_sales_velocity": current_sales_velocity,
+        "capacity": event.capacity,
+        "base_ticket_price": event.base_ticket_price,
+        "total_budget": total_budget,
+    }])
+
+    prediction = forecast_model.predict(input_df)[0]
+    prediction_map = dict(zip(target_order, prediction))
+
+    expected_attendance_count = max(0.0, float(prediction_map.get("expected_total_attendance", tickets_sold)))
+    predicted_optimal_price = max(0.01, float(prediction_map.get("optimal_ticket_price", event.base_ticket_price)))
+
+    expected_capacity_percentage = (
+        (expected_attendance_count / event.capacity) * 100.0 if event.capacity > 0 else 0.0
+    )
+    projected_ticket_revenue = expected_attendance_count * predicted_optimal_price
+
+    secondary_revenue_per_head = {
+        "Concert": 25.0,
+        "Conference": 15.0,
+        "Sports": 30.0,
+    }.get(event.event_type, 10.0)
+    estimated_secondary_revenue = expected_attendance_count * secondary_revenue_per_head
+
+    total_projected_revenue = projected_ticket_revenue + estimated_secondary_revenue
+    net_profit = total_projected_revenue - total_budget
+    break_even_tickets = (
+        math.floor(total_budget / predicted_optimal_price)
+        if predicted_optimal_price > 0
+        else 0
+    )
+
+    if current_sales_velocity >= 20 and days_left > 14:
+        demand_status = "Surge Potential"
+    elif current_sales_velocity < 5 and days_left < 7:
+        demand_status = "Cold"
+    else:
+        demand_status = "On Track"
+
+    return jsonify({
+        "event_name": event.name,
+        "event_id": event.id,
+        "event_type": event.event_type,
+        "days_left": days_left,
+        "booking_count": booking_count,
+        "tickets_sold": tickets_sold,
+        "current_sales_velocity": round(current_sales_velocity, 4),
+        "base_price": round(event.base_ticket_price, 2),
+        "total_budget": round(total_budget, 2),
+        "predicted_optimal_price": round(predicted_optimal_price, 2),
+        "expected_attendance_count": round(expected_attendance_count, 2),
+        "expected_capacity_percentage": round(expected_capacity_percentage, 2),
+        "projected_ticket_revenue": round(projected_ticket_revenue, 2),
+        "estimated_secondary_revenue": round(estimated_secondary_revenue, 2),
+        "total_projected_revenue": round(total_projected_revenue, 2),
+        "net_profit": round(net_profit, 2),
+        "break_even_tickets": break_even_tickets,
+        "demand_status": demand_status,
+        # Backward-compatible aliases for existing UI consumers.
+        "expected_attendance_percentage": round(expected_capacity_percentage, 2),
+        "revenue_delta": round(predicted_optimal_price - event.base_ticket_price, 2),
+    })
 
 # ---- Utility ---------------------------------------------------------------
 

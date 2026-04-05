@@ -60,14 +60,22 @@
                         </li>
                         {% endif %}
 
-                        <!-- User Profile / Logout -->
+                        <!-- User Profile / Utilities -->
                         <li class="nav-item ms-lg-3 d-flex align-items-center gap-3">
-                            <span class="text-secondary small">
+                            <span class="text-secondary small d-none d-xl-block">
                                 Welcome, <strong class="text-white">{{ current_user.name }}</strong>
                             </span>
-                            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger" style="border-radius: 999px;">
-                                <i class="bi bi-box-arrow-right me-1"></i>Logout
-                            </a>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if current_user.role != 'admin' %}
+                                <a href="{{ url_for('my_tickets') }}" class="btn btn-sm btn-outline-secondary text-light px-3" style="border-radius: 999px;">
+                                    <i class="bi bi-ticket-detailed me-1"></i>My Tickets
+                                </a>
+                                {% endif %}
+                                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger px-3 text-danger" style="border-radius: 999px;">
+                                    <i class="bi bi-box-arrow-right d-xl-none"></i>
+                                    <span class="d-none d-xl-inline"><i class="bi bi-box-arrow-right me-1"></i>Logout</span>
+                                </a>
+                            </div>
                         </li>
                     {% else %}
                         <!-- Unauthenticated -->

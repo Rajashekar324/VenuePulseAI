@@ -49,23 +49,6 @@
             <p class="text-secondary mb-0">Grab your tickets before they sell out</p>
         </div>
         <div class="d-flex align-items-center gap-3">
-            <div class="dropdown">
-                <button class="btn btn-outline-light dropdown-toggle" style="border-radius: 999px; font-size: 0.9rem;" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-funnel me-1"></i> 
-                    {% if request.args.get('event_type') %}
-                        {{ request.args.get('event_type') }}
-                    {% else %}
-                        All Events
-                    {% endif %}
-                </button>
-                <ul class="dropdown-menu dropdown-menu-dark shadow">
-                    <li><a class="dropdown-item" href="{{ url_for('index') }}">All Events</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ url_for('index', event_type='Concert') }}">Concerts</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('index', event_type='Conference') }}">Conferences</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('index', event_type='Sports') }}">Sports</a></li>
-                </ul>
-            </div>
             <span class="badge vp-badge-glow fs-6">
                 <i class="bi bi-calendar-event me-1"></i>{{ events | length }} event{{ 's' if events | length != 1 }}
             </span>
@@ -119,6 +102,14 @@
         </div>
         {% endfor %}
     </div>
+    
+    <!-- View All CTA -->
+    <div class="mt-5 text-center animate-fade-up delay-300">
+        <a href="{{ url_for('events_catalog') }}" class="btn btn-outline-light rounded-pill px-5 py-2">
+            View All Events <i class="bi bi-arrow-right ms-2"></i>
+        </a>
+    </div>
+
     {% else %}
     <div class="vp-empty-state text-center py-5">
         <i class="bi bi-music-note-beamed display-1 text-secondary mb-3 d-block"></i>

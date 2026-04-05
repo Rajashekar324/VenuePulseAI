@@ -47,6 +47,7 @@ class Event(db.Model):
     event_type = db.Column(db.String(100), nullable=False) # e.g. concert, conference, sports
     capacity = db.Column(db.Integer, nullable=False)
     base_ticket_price = db.Column(db.Float, nullable=False)
+    total_budget = db.Column(db.Float, nullable=False, default=0.0)
 
     # Relationships
     tickets = db.relationship("Ticket", backref="event", lazy=True, cascade="all, delete-orphan")
@@ -54,19 +55,20 @@ class Event(db.Model):
     staff_shifts = db.relationship("StaffShift", backref="event", lazy=True, cascade="all, delete-orphan")
     bookings = db.relationship("Booking", backref="event", lazy=True, cascade="all, delete-orphan")
 
-    def __init__(self, name, date, genre, event_type, capacity, base_ticket_price):
+    def __init__(self, name, date, genre, event_type, capacity, base_ticket_price, total_budget=0.0):
         self.name = name
         self.date = date
         self.genre = genre
         self.event_type = event_type
         self.capacity = capacity
         self.base_ticket_price = base_ticket_price
+        self.total_budget = total_budget
 
     def __repr__(self):
         return (
             f"<Event id={self.id} name='{self.name}' "
             f"type='{self.event_type}' date={self.date:%Y-%m-%d} "
-            f"capacity={self.capacity} base_price={self.base_ticket_price}>"
+            f"capacity={self.capacity} base_price={self.base_ticket_price} budget={self.total_budget}>"
         )
 
 

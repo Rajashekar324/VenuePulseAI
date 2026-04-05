@@ -1,0 +1,22 @@
+{
+  "features": [
+    "event_type",
+    "days_until_event",
+    "current_tickets_sold",
+    "current_sales_velocity",
+    "capacity",
+    "base_ticket_price",
+    "total_budget"
+  ],
+  "targets": [
+    "expected_total_attendance",
+    "optimal_ticket_price"
+  ],
+  "rows": 9199,
+  "metrics": {
+    "attendance_mae": 0.4934649330154433,
+    "attendance_r2": 0.9108374940024494,
+    "optimal_price_mae": 0.6866198121159109,
+    "optimal_price_r2": 0.9998743237947298
+  }
+}
