@@ -95,6 +95,46 @@
         </div>
     </div>
 
+    <ul class="nav nav-tabs mb-4" id="adminDashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link active"
+                id="operations-overview-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#operations-overview-pane"
+                type="button"
+                role="tab"
+                aria-controls="operations-overview-pane"
+                aria-selected="true"
+            >
+                Operations Overview
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link"
+                id="enterprise-analytics-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#enterprise-analytics-pane"
+                type="button"
+                role="tab"
+                aria-controls="enterprise-analytics-pane"
+                aria-selected="false"
+            >
+                Enterprise Analytics
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="adminDashboardTabContent">
+        <div
+            class="tab-pane fade show active"
+            id="operations-overview-pane"
+            role="tabpanel"
+            aria-labelledby="operations-overview-tab"
+            tabindex="0"
+        >
+
     <!-- ===== Metrics Cards (3 columns) ===== -->
     <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
 
@@ -605,6 +645,88 @@
                 <p class="text-secondary">No upcoming events scheduled</p>
             </div>
             {% endif %}
+        </div>
+    </div>
+
+        </div>
+
+        <div
+            class="tab-pane fade"
+            id="enterprise-analytics-pane"
+            role="tabpanel"
+            aria-labelledby="enterprise-analytics-tab"
+            tabindex="0"
+        >
+            <div class="card vp-panel border-0 mb-4 animate-fade-up delay-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+                        <h5 class="fw-bold mb-0">
+                            <i class="bi bi-bar-chart-line me-2 text-primary"></i>Enterprise Analytics
+                        </h5>
+                        <a
+                            href="{{ url_for('analytics_dashboard') }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-sm btn-outline-primary"
+                        >
+                            Export Raw JSON
+                        </a>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-12">
+                            <div class="card border-secondary border-opacity-25 bg-dark h-100">
+                                <div class="card-header border-secondary border-opacity-25">
+                                    <h6 class="fw-semibold mb-0">Dashboard A: Revenue &amp; Demand Heatmaps (AI vs. Market)</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <iframe
+                                        src="https://app.powerbi.com/reportEmbed?reportId=b06516ef-5b86-43ef-a0ac-f963aca9b65b&autoAuth=true"
+                                        width="100%"
+                                        height="600"
+                                        frameborder="0"
+                                        allowFullScreen="true"
+                                    ></iframe>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <div class="card border-secondary border-opacity-25 bg-dark h-100">
+                                <div class="card-header border-secondary border-opacity-25">
+                                    <h6 class="fw-semibold mb-0">Dashboard B: Helpdesk Ops &amp; AI Triage Funnel</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <iframe
+                                        src="https://app.powerbi.com/reportEmbed?reportId=c3162e12-6028-458d-8879-f4e2ff57f8d6&autoAuth=true"
+                                        width="100%"
+                                        height="450"
+                                        frameborder="0"
+                                        allowFullScreen="true"
+                                    ></iframe>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <div class="card border-secondary border-opacity-25 bg-dark h-100">
+                                <div class="card-header border-secondary border-opacity-25">
+                                    <h6 class="fw-semibold mb-0">Dashboard C: Operational Efficiency &amp; Staffing</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <iframe
+                                        src="https://app.powerbi.com/reportEmbed?reportId=91309a2b-a119-4154-accc-e1ec91db16b2&autoAuth=true"
+                                        width="100%"
+                                        height="450"
+                                        frameborder="0"
+                                        allowFullScreen="true"
+                                    ></iframe>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
