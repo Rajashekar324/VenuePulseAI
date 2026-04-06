@@ -528,7 +528,7 @@
                     </thead>
                     <tbody id="supportTicketsTbody">
                         {% for ticket in open_tickets %}
-                        <tr>
+                        <tr data-ticket-id="{{ ticket.id }}">
                             <td class="text-secondary">#{{ ticket.id }}</td>
                             <td class="fw-semibold">{{ ticket.subject }}</td>
                             <td>
@@ -814,6 +814,20 @@ document.addEventListener("DOMContentLoaded", function () {
         setCrewStatus(2, staffingApplied ? "Done" : "Review", staffingApplied ? "success" : "warning");
     }
 
+    function extractResolvedTicketIds(reportHtml) {
+        const parserDiv = document.createElement("div");
+        parserDiv.innerHTML = reportHtml || "";
+        const reportText = parserDiv.textContent || "";
+        const resolvedIds = new Set();
+        const successPattern = /Ticket\s*#(\d+):\s*Success/gi;
+        let match = successPattern.exec(reportText);
+        while (match !== null) {
+            resolvedIds.add(match[1]);
+            match = successPattern.exec(reportText);
+        }
+        return Array.from(resolvedIds);
+    }
+
     function formatCurrency(value) {
         return `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
@@ -986,16 +1000,30 @@ document.addEventListener("DOMContentLoaded", function () {
                     supportCrewReportContainer.innerHTML = payload.report || '<div class="alert alert-warning py-2 mb-0">No report was returned.</div>';
                 }
 
-                if (supportTicketsTbody) {
-                    supportTicketsTbody.innerHTML = "";
+                const resolvedTicketIds = extractResolvedTicketIds(payload.report || "");
+                if (supportTicketsTbody && resolvedTicketIds.length > 0) {
+                    resolvedTicketIds.forEach((ticketId) => {
+                        const row = supportTicketsTbody.querySelector(`tr[data-ticket-id="${ticketId}"]`);
+                        if (row) {
+                            row.remove();
+                        }
+                    });
                 }
+
+                const remainingOpenCount = supportTicketsTbody
+                    ? supportTicketsTbody.querySelectorAll("tr").length
+                    : 0;
                 if (openTicketsBadge) {
-                    openTicketsBadge.textContent = "0 Open";
-                    openTicketsBadge.className = "badge bg-success bg-opacity-10 text-success border border-success border-opacity-25";
+                    openTicketsBadge.textContent = `${remainingOpenCount} Open`;
+                    if (remainingOpenCount === 0) {
+                        openTicketsBadge.className = "badge bg-success bg-opacity-10 text-success border border-success border-opacity-25";
+                    } else {
+                        openTicketsBadge.className = "badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25";
+                    }
                 }
 
                 runSupportCrewBtn.innerHTML = originalButtonText;
-                runSupportCrewBtn.disabled = true;
+                runSupportCrewBtn.disabled = remainingOpenCount === 0;
             } catch (error) {
                 if (supportCrewReportContainer) {
                     const safeMessage = (error && error.message) ? error.message : "Failed to run support crew.";

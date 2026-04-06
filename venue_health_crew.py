@@ -87,14 +87,95 @@ def _run_event_guardrail_actions(event_data: Any, financial_data: Any) -> list[s
     return notes.get("staffing", [])
 
 
-def _run_support_guardrail_actions(open_tickets: Any, event_name: str = "the event") -> list[str]:
-    """Run deterministic helpdesk actions for the support-triage crew."""
-    notes = _run_guardrail_actions(
-        event_data={"name": event_name},
-        financial_data={},
-        open_tickets=open_tickets,
+_SIMPLE_TICKET_HINTS = (
+    "faq",
+    "lost ticket",
+    "lost my ticket",
+    "event time",
+    "what time",
+    "when does",
+    "start time",
+    "parking",
+    "where to park",
+    "where do i book",
+    "book my ticket",
+    "book ticket",
+    "how to book",
+    "find event",
+    "new event",
+    "events section",
+    "where can i book",
+)
+
+_COMPLEX_TICKET_HINTS = (
+    "refund",
+    "chargeback",
+    "angry",
+    "complaint",
+    "technical",
+    "bug",
+    "not working",
+    "error",
+    "vip",
+)
+
+
+def _classify_support_ticket(ticket: dict[str, Any]) -> str:
+    """Classify tickets into Tier 1 Simple vs Complex buckets."""
+    subject = str(ticket.get("subject", "") or "").lower()
+    description = str(ticket.get("description", "") or "").lower()
+    text = f"{subject} {description}"
+
+    if any(hint in text for hint in _COMPLEX_TICKET_HINTS):
+        return "complex"
+    if any(hint in text for hint in _SIMPLE_TICKET_HINTS):
+        return "simple"
+
+    # Default to human escalation when uncertain.
+    return "complex"
+
+
+def _build_simple_ticket_reply(ticket: dict[str, Any], event_name: str) -> str:
+    """Draft a concise Tier 1 reply for simple tickets."""
+    subject = str(ticket.get("subject", "your request") or "your request")
+    return (
+        f"Hello,\n\n"
+        f"Thanks for reaching out about \"{subject}\" for {event_name}. "
+        "We have reviewed your request and resolved it from our side. "
+        "If anything still looks off, reply to this email and our team will help right away.\n\n"
+        "Best regards,\nVenuePulse Support"
     )
-    return notes.get("helpdesk", [])
+
+
+def _run_support_guardrail_actions(open_tickets: Any, event_name: str = "the event") -> dict[str, list[str]]:
+    """Run Tier 1 deterministic fallback: resolve only simple tickets, escalate complex."""
+    notes: dict[str, list[str]] = {"auto_resolved": [], "escalated": []}
+
+    if not isinstance(open_tickets, list):
+        return notes
+
+    for ticket in open_tickets[:20]:
+        if not isinstance(ticket, dict):
+            continue
+
+        ticket_id = ticket.get("id")
+        if ticket_id is None:
+            continue
+
+        tier = _classify_support_ticket(ticket)
+        if tier == "simple":
+            email_response = _build_simple_ticket_reply(ticket, event_name)
+            tool_result = resolve_helpdesk_ticket.run(
+                ticket_id=int(ticket_id),
+                email_response=email_response,
+            )
+            notes["auto_resolved"].append(f"Ticket #{ticket_id}: {tool_result}")
+        else:
+            notes["escalated"].append(
+                f"Ticket #{ticket_id}: Escalated to human review (complex)."
+            )
+
+    return notes
 
 
 def _build_llm_and_model() -> tuple[LLM, str]:
@@ -348,16 +429,23 @@ def run_support_triage_crew(open_tickets: Any) -> str:
 
     helpdesk_task = Task(
         description=(
-            "You are in strict tool-calling mode.\n\n"
+            "You are a strict Tier 1 support filter.\n\n"
             f"Open Tickets:\n{tickets_context}\n\n"
-            "For each listed open ticket, call `resolve_helpdesk_ticket` with:\n"
-            "- ticket_id (int)\n"
-            "- email_response (str, polite and concise)\n\n"
-            "After all tool calls, return one short plain-text summary with resolved ticket IDs.\n"
-            "Do NOT include markdown headings, bullet lists, or explanatory paragraphs before tool calls."
+            "First classify EACH ticket as either Simple or Complex using this policy:\n"
+            "- Simple: FAQs, lost tickets, asking for event times, parking questions.\n"
+            "- Complex: refund requests, angry complaints, technical bugs, VIP inquiries.\n\n"
+            "Rules:\n"
+            "1) If Simple: you MUST draft a polite reply and MUST call `resolve_helpdesk_ticket` to close it.\n"
+            "   Tool args:\n"
+            "   - ticket_id (int)\n"
+            "   - email_response (str)\n"
+            "2) If Complex: you MUST NOT call the tool. Draft only a suggested admin reply and leave ticket untouched.\n"
+            "3) Final output MUST clearly include these sections with ticket IDs:\n"
+            "   - Auto-Resolved (Simple)\n"
+            "   - Escalated to Human (Complex)"
         ),
         expected_output=(
-            "A short plain-text summary listing ticket IDs resolved via resolve_helpdesk_ticket."
+            "A Tier 1 triage report with two sections: Auto-Resolved (Simple) and Escalated to Human (Complex), with ticket IDs and suggested replies."
         ),
         agent=helpdesk_triage,
     )
@@ -378,17 +466,52 @@ def run_support_triage_crew(open_tickets: Any) -> str:
         else "Crew run did not return a valid tool-call response from the model. Deterministic support actions were executed."
     )
 
-    helpdesk_lines = _run_support_guardrail_actions(open_tickets=open_tickets)
+    event_name = "the event"
+    if isinstance(open_tickets, list) and open_tickets:
+        first_ticket = open_tickets[0]
+        if isinstance(first_ticket, dict):
+            event_name = str(first_ticket.get("event_name") or "the event")
 
-    return _build_markdown_report(
-        title="Support Triage Crew Report",
-        active_model=active_model,
-        final_output=final_output,
-        kickoff_error=kickoff_error,
-        task_sections=task_sections,
-        guardrail_heading="Helpdesk",
-        guardrail_lines=helpdesk_lines,
+    support_notes = _run_support_guardrail_actions(
+        open_tickets=open_tickets,
+        event_name=event_name,
     )
+    auto_resolved = support_notes.get("auto_resolved", [])
+    escalated = support_notes.get("escalated", [])
+
+    generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    markdown_report = (
+        "# Support Triage Crew Report\n\n"
+        f"- Model: `{active_model}`\n"
+        f"- Generated: `{generated_at}`\n\n"
+        "## Final Crew Output\n\n"
+        f"{final_output}\n"
+    )
+
+    if kickoff_error:
+        markdown_report += (
+            "\n## Crew Execution Note\n\n"
+            f"- Encountered model/tool-call issue: `{kickoff_error}`\n"
+            "- Returned report includes deterministic Tier 1 actions and outcomes.\n"
+        )
+
+    markdown_report += "\n## Tier 1 Filter Results\n\n"
+    markdown_report += "### Auto-Resolved (Simple)\n"
+    if auto_resolved:
+        markdown_report += "\n".join([f"- {line}" for line in auto_resolved]) + "\n"
+    else:
+        markdown_report += "- None.\n"
+
+    markdown_report += "\n### Escalated to Human (Complex)\n"
+    if escalated:
+        markdown_report += "\n".join([f"- {line}" for line in escalated]) + "\n"
+    else:
+        markdown_report += "- None.\n"
+
+    if task_sections:
+        markdown_report += "\n---\n\n" + "\n\n---\n\n".join(task_sections)
+
+    return markdown_report
 
 
 def run_venue_health_check(event_data: Any, financial_data: Any, open_tickets: Any) -> str:
